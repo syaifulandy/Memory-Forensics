@@ -18,7 +18,7 @@ REPORT_FILE="$OUTPUT_DIR/report_analisis_memory.txt"
 
 # Validasi file output yang dibutuhkan
 echo "[+] Validating required output files..."
-required_files=("windows_malfind_" "windows_pslist_" "windows_pstree_" "windows_cmdline_" "windows_netstat_" "windows_netscan_")
+required_files=("windows_malfind_" "windows_pslist_" "windows_pstree_" "windows_cmdline_" "windows_netstat_" "windows_netscan_" "windows_svcscan_" "windows_pslist_" "windows_psscan_")
 for prefix in "${required_files[@]}"; do
   file_path=$(ls "$OUTPUT_DIR"/${prefix}*.txt 2>/dev/null | head -n1)
   if [[ -z "$file_path" ]]; then
@@ -34,10 +34,14 @@ PSTREE_FILE=$(ls "$OUTPUT_DIR"/windows_pstree_*.txt | head -n1)
 CMDLINE_FILE=$(ls "$OUTPUT_DIR"/windows_cmdline_*.txt | head -n1)
 NETSTAT_FILE=$(ls "$OUTPUT_DIR"/windows_netstat_*.txt | head -n1)
 NETSCAN_FILE=$(ls "$OUTPUT_DIR"/windows_netscan_*.txt | head -n1)
+SERVICESCAN_FILE=$(ls "$OUTPUT_DIR"/windows_svcscan_*.txt | head -n1)
+PSSCAN_FILE=$(ls "$OUTPUT_DIR"/windows_psscan_*.txt | head -n1)
+
 
 # mengabaikan baris Volatility dan warning, ambil baris pertama dengan lebih dari satu kolom (anggap sebagai header).
 get_header() {
-  grep -vE '^(Volatility|WARNING)' windows_pstree_Win7-2515534d.vmem.txt | awk 'NF > 1 { print; exit }'
+  local file="$1"
+  grep -vE '^(Volatility|WARNING)' "$file" | awk 'NF > 1 { print; exit }'
 }
 
 
@@ -45,7 +49,7 @@ echo "[+] Extracting PIDs with PAGE_EXECUTE_READWRITE..."
 PIDS=$(grep -E '^[1-9][0-9]*' "$MALFIND_FILE" | awk '$6 == "PAGE_EXECUTE_READWRITE" {print $1}' | sort -u)
 
 # Step 1
-echo "[1/8] Writing Identifying Injected Code section..."
+echo "[1/11] Writing Identifying Injected Code section..."
 {
   echo "Identifying Injected Code (Process with PAGE_EXECUTE_READWRITE permissions)"
   echo "$PIDS"
@@ -53,7 +57,7 @@ echo "[1/8] Writing Identifying Injected Code section..."
 } > "$REPORT_FILE"
 
 # Step 2 - pslist
-echo "[2/8] Writing Identifying Running Processes section..."
+echo "[2/11] Writing Identifying Running Processes section..."
 {
   echo "Identifying Running Processes"
   get_header "$PSLIST_FILE"
@@ -64,7 +68,7 @@ echo "[2/8] Writing Identifying Running Processes section..."
 } >> "$REPORT_FILE"
 
 # Step 3 - pstree
-echo "[3/8] Writing Identifying Running Processes (Check parent process ID) section..."
+echo "[3/11] Writing Identifying Running Processes (Check parent process ID) section..."
 {
   echo "Identifying Running Processes (Check parent process ID)"
   get_header "$PSTREE_FILE"
@@ -75,7 +79,7 @@ echo "[3/8] Writing Identifying Running Processes (Check parent process ID) sect
 } >> "$REPORT_FILE"
 
 # Step 4 - cmdline
-echo "[4/8] Writing Identifying Command Line Arguments section..."
+echo "[4/11] Writing Identifying Command Line Arguments section..."
 {
   echo "Identifying Command Line Arguments"
   get_header "$CMDLINE_FILE"
@@ -86,7 +90,7 @@ echo "[4/8] Writing Identifying Command Line Arguments section..."
 } >> "$REPORT_FILE"
 
 # Step 5 - DLL list
-echo "[5/8] Writing Identifying Loaded DLLs section..."
+echo "[5/11] Writing Identifying Loaded DLLs section..."
 {
   echo "Identifying Loaded DLLs"
   for pid in $PIDS; do
@@ -97,7 +101,7 @@ echo "[5/8] Writing Identifying Loaded DLLs section..."
 } >> "$REPORT_FILE"
 
 # Step 6 - Handles
-echo "[6/8] Writing Identifying Handles section..."
+echo "[6/11] Writing Identifying Handles section..."
 {
   echo "Identifying Handles"
   for pid in $PIDS; do
@@ -109,7 +113,7 @@ echo "[6/8] Writing Identifying Handles section..."
 
 
 # Step 7 - netstat
-echo "[7/8] Writing Network Connections (Netstat) section..."
+echo "[7/11] Writing Network Connections (Netstat) section..."
 {
   echo "Network Connections (Netstat)"
   get_header "$NETSTAT_FILE"
@@ -120,7 +124,7 @@ echo "[7/8] Writing Network Connections (Netstat) section..."
 } >> "$REPORT_FILE"
 
 # Step 8 - netscan
-echo "[8/8] Writing Network Connections (Netscan) section..."
+echo "[8/1]1 Writing Network Connections (Netscan) section..."
 {
   echo "Network Connections (Netscan)"
   get_header "$NETSCAN_FILE"
@@ -130,7 +134,42 @@ echo "[8/8] Writing Network Connections (Netscan) section..."
   echo
 } >> "$REPORT_FILE"
 
-# Step 9 - memory dump (optional)
+# Step 9 - svcscan
+echo "[9/11] Writing Service Scan (svcscan) section..."
+{
+  echo "Service Scan (svcscan)"
+  get_header "$SERVICESCAN_FILE"
+  for pid in $PIDS; do
+    grep -E "[[:space:]]$pid[[:space:]]" "$SERVICESCAN_FILE"
+  done
+  echo
+} >> "$REPORT_FILE"
+
+
+# Step 10 - psscan & pslist
+echo "[10/11] Writing rootkit detection section..."
+{
+  echo "Rootkit detection using psscan vs pslist"
+  # Ekstrak PID, PPID, ImageFileName dari file
+  TMP_PSLIST=$(mktemp)
+  TMP_PSSCAN=$(mktemp)
+  
+  grep -E '^[0-9]+\s+[0-9]+\s+\S+' "$PSLIST_FILE" | awk '{print $1, $2, $3}' | sort > "$TMP_PSLIST"
+  grep -E '^[0-9]+\s+[0-9]+\s+\S+' "$PSSCAN_FILE" | awk '{print $1, $2, $3}' | sort > "$TMP_PSSCAN"
+  
+  # Tampilkan proses yang hanya muncul di psscan
+  echo "Proses mencurigakan (hanya di psscan, kemungkinan hidden):"
+  comm -13 "$TMP_PSLIST" "$TMP_PSSCAN"
+  
+  echo ""
+  echo "Proses hanya di pslist (tidak di psscan, anomali langka):"
+  comm -23 "$TMP_PSLIST" "$TMP_PSSCAN"
+  
+  # Hapus file sementara
+  rm -f "$TMP_PSLIST" "$TMP_PSSCAN"
+} >> "$REPORT_FILE"
+
+# Step 11 - memory dump (optional)
 if [[ "$DUMP_MEMORY" == "yes" ]]; then
   echo "[+] Performing memory dump for all detected PIDs..."
   for pid in $PIDS; do
