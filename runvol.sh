@@ -22,6 +22,9 @@ PLUGINS=(
   "windows.cmdline"
   "windows.netstat"
   "windows.netscan"
+  "windows.psscan"
+  "windows.svcscan"
+  "windows.registry.hivelist" #tidak dianalisis otomatis
 )
 
 # Jalankan tiap plugin dan simpan output ke file
