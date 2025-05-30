@@ -35,9 +35,9 @@ CMDLINE_FILE=$(ls "$OUTPUT_DIR"/windows_cmdline_*.txt | head -n1)
 NETSTAT_FILE=$(ls "$OUTPUT_DIR"/windows_netstat_*.txt | head -n1)
 NETSCAN_FILE=$(ls "$OUTPUT_DIR"/windows_netscan_*.txt | head -n1)
 
-# Ambil baris ke-3 sebagai header
+# mengabaikan baris Volatility dan warning, ambil baris pertama dengan lebih dari satu kolom (anggap sebagai header).
 get_header() {
-  sed -n '3p' "$1"
+  grep -vE '^(Volatility|WARNING)' windows_pstree_Win7-2515534d.vmem.txt | awk 'NF > 1 { print; exit }'
 }
 
 
