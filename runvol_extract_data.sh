@@ -24,6 +24,8 @@ PLUGINS=(
   "windows.netscan"
   "windows.psscan"
   "windows.svcscan"
+  "windows.dlllist"
+  "windows.handles"
   "windows.registry.hivelist" #tidak dianalisis otomatis
 )
 
