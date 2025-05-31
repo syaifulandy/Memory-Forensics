@@ -57,7 +57,8 @@ NETSTAT_FILE=$(ls "$OUTPUT_DIR"/windows_netstat_*.txt | head -n1)
 NETSCAN_FILE=$(ls "$OUTPUT_DIR"/windows_netscan_*.txt | head -n1)
 SERVICESCAN_FILE=$(ls "$OUTPUT_DIR"/windows_svcscan_*.txt | head -n1)
 PSSCAN_FILE=$(ls "$OUTPUT_DIR"/windows_psscan_*.txt | head -n1)
-
+HANDLES_FILE=$(ls "$OUTPUT_DIR"/windows_handles_*.txt | head -n1)
+DLLLIST_FILE=$(ls "$OUTPUT_DIR"/windows_dlllist_*.txt | head -n1)
 
 # mengabaikan baris Volatility dan warning, ambil baris pertama dengan lebih dari satu kolom (anggap sebagai header).
 get_header() {
@@ -138,12 +139,11 @@ echo "[4/11] Writing Identifying Running Processes (Check parent process ID) sec
   echo "Identifying Running Processes (Check parent process ID)"
   get_header "$PSTREE_FILE"
 
-  # Buat set kosong untuk melacak PID yang sudah dicetak
   PRINTED_PIDS=""
 
   for pid in $PIDS; do
     # Cari baris induk (tanpa *)
-    base_line=$(grep -E "^[[:space:]]*$pid[[:space:]]" "$PSTREE_FILE")
+    base_line=$(grep -E "^$pid[[:space:]]" "$PSTREE_FILE")
 
     if [ -n "$base_line" ]; then
       this_pid=$(echo "$base_line" | awk '{print $1}')
@@ -155,7 +155,7 @@ echo "[4/11] Writing Identifying Running Processes (Check parent process ID) sec
       # Ambil semua anak berdasarkan struktur pohon (*, **, dll)
       found=0
       while IFS= read -r line; do
-        if [[ "$line" =~ ^[[:space:]]*$pid[[:space:]] ]]; then
+        if [[ "$line" =~ ^$pid[[:space:]] ]]; then
           found=1
           continue
         fi
@@ -175,7 +175,12 @@ echo "[4/11] Writing Identifying Running Processes (Check parent process ID) sec
     fi
   done
   echo
+
+  # Update PIDS dengan semua PID unik yang sudah dicetak
+  # Gunakan tr dan sort -u untuk unik dan rapikan
+  PIDS=$(echo "$PIDS $PRINTED_PIDS" | tr ' ' '\n' | grep -E '^[0-9]+$' | sort -u | tr '\n' ' ' | sed 's/ $//')
 } >> "$REPORT_FILE"
+
 
 
 # Step 5 - cmdline
@@ -193,9 +198,9 @@ echo "[5/11] Writing Identifying Command Line Arguments section..."
 echo "[6/11] Writing Identifying Loaded DLLs section..."
 {
   echo "Identifying Loaded DLLs"
+  get_header "$DLLLIST_FILE"
   for pid in $PIDS; do
-    echo -e "\nDLLs for PID $pid"
-    vol -q -f "$MEMORY_FILE" windows.dlllist --pid "$pid"
+    grep -E "^$pid[[:space:]]" "$DLLLIST_FILE"
   done
   echo
 } >> "$REPORT_FILE"
@@ -204,9 +209,9 @@ echo "[6/11] Writing Identifying Loaded DLLs section..."
 echo "[7/11] Writing Identifying Handles section..."
 {
   echo "Identifying Handles"
+  get_header "$HANDLES_FILE"
   for pid in $PIDS; do
-    echo -e "\nHandles for PID $pid"
-    vol -q -f "$MEMORY_FILE" windows.handles --pid "$pid"
+    grep -E "^$pid[[:space:]]" "$HANDLES_FILE"
   done
   echo
 } >> "$REPORT_FILE"
