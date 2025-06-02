@@ -51,7 +51,7 @@ while getopts "p:t:" opt; do
 done
 
 if [[ -z "$psscan_file" || -z "$pstree_file" ]]; then
-  echo "Both -p and -t options are required."
+  echo "Usage: $0 -p <windows_psscan_*> -t <windows_pstree_*>"
   exit 1
 fi
 
@@ -61,7 +61,7 @@ basename_psscan=$(basename "$psscan_file")
 basename_pstree=$(basename "$pstree_file" | sed 's/^windows_pstree_//')
 
 psscan_output="output_${basename_psscan}"
-pstree_output="output_process_analysis_${basename_pstree%.txt}.csv"
+pstree_output="output_pstree_analysis_${basename_pstree%.txt}.csv"
 
 # 1. Baca kamus jadi associative array
 declare -A path_kamus parent_kamus
