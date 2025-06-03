@@ -50,11 +50,6 @@ while getopts "p:t:" opt; do
   esac
 done
 
-Step 1: Hapus * di awal baris diikuti spasi
-sed -E 's/^\*+ +//; s/\*//g' "$pstree_file" > temp_pstree.txt
-
-Step 2: Hapus semua sisa * di mana pun
-pstree_file="temp_pstree.txt"
 
 if [[ -z "$psscan_file" || -z "$pstree_file" ]]; then
   echo "Usage: $0 -p <windows_psscan_*> -t <windows_pstree_*>"
@@ -65,6 +60,14 @@ kamus_file="kamus.txt"
 
 basename_psscan=$(basename "$psscan_file")
 basename_pstree=$(basename "$pstree_file" | sed 's/^windows_pstree_//')
+temp_pstree="temp_${basename_pstree}.txt"
+
+
+# Step 1: Hapus * di awal baris diikuti spasi
+sed -E 's/^\*+ +//; s/\*//g' "$pstree_file" > "$temp_pstree"
+
+# Step 2: Hapus semua sisa * di mana pun
+pstree_file="temp_pstree.txt"
 
 psscan_output="output_${basename_psscan}"
 pstree_output="output_pstree_analysis_${basename_pstree%.txt}.csv"
