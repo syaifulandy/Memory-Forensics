@@ -50,6 +50,12 @@ while getopts "p:t:" opt; do
   esac
 done
 
+Step 1: Hapus * di awal baris diikuti spasi
+sed -E 's/^\*+ +//; s/\*//g' "$pstree_file" > temp_pstree.txt
+
+Step 2: Hapus semua sisa * di mana pun
+pstree_file="temp_pstree.txt"
+
 if [[ -z "$psscan_file" || -z "$pstree_file" ]]; then
   echo "Usage: $0 -p <windows_psscan_*> -t <windows_pstree_*>"
   exit 1
