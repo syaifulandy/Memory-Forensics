@@ -95,8 +95,9 @@ while read -r pid proc; do
 done < "$psscan_output"
 
 # 3. Ekstrak dari pstree + konversi PPID ke process name
-echo "pid,ppid,image,path,parent_proc,status" > "$pstree_output"
-awk -F'\t' 'BEGIN{OFS=","} /^[0-9]+/ { print $1, $2, tolower($3), $11, $13 }' "$pstree_file" | while IFS=',' read -r pid ppid image audit path; do
+echo "pid,ppid,image,path,parent_proc,exit_time,status" > "$pstree_output"
+awk -F'\t' 'BEGIN{OFS=","} /^[0-9]+/ { print $1, $2, tolower($3), $11, $13, $10 }' "$pstree_file" | \
+while IFS=',' read -r pid ppid image audit path exit_time; do
   # Skip SYSTEM dengan PPID 0
   if [[ "$image" == "system" && "$ppid" == "0" ]]; then
     continue
@@ -107,18 +108,26 @@ awk -F'\t' 'BEGIN{OFS=","} /^[0-9]+/ { print $1, $2, tolower($3), $11, $13 }' "$
 
   norm_path=$(combine_paths "$audit" "$path")
 
-  # 4. Validasi dengan kamus
-  allowed_path="${path_kamus[$image]}"
-  allowed_parents="${parent_kamus[$image]}"
-  status=""
+  # Ganti ExitTime jadi RUNNING jika masih aktif
+  [[ "$exit_time" == "N/A" ]] && exit_time="RUNNING"
 
-  [[ "$norm_path" != "$allowed_path" ]] && status="MALICIOUS_PATH"
-  ! echo "$allowed_parents" | grep -qw "$parent_proc" && status="${status:+${status}_}MALICIOUS_PARENT"
-  [[ "$status" == "MALICIOUS_PATH_MALICIOUS_PARENT" ]] && status="UNKNOWN_PROCESS"
-  [[ -z "$status" ]] && status="OK"
-
-  echo "$pid,$ppid,$image,$norm_path,$parent_proc,$status"
+    # 4. Validasi dengan kamus
+    if [[ -n "$image" && -n "${path_kamus[$image]+_}" && -n "${parent_kamus[$image]+_}" ]]; then
+      allowed_path="${path_kamus[$image]}"
+      allowed_parents="${parent_kamus[$image]}"
+    
+      status=""
+      [[ "$norm_path" != "$allowed_path" ]] && status="MALICIOUS_PATH"
+      ! echo "$allowed_parents" | grep -qw "$parent_proc" && status="${status:+${status}_}MALICIOUS_PARENT"
+      [[ -z "$status" ]] && status="OK"
+    else
+      status="UNKNOWN_PROCESS"
+    fi
+    
+    echo "$pid,$ppid,$image,$norm_path,$parent_proc,$exit_time,$status"
 done >> "$pstree_output"
+
+
 rm $psscan_output
 rm $temp_pstree
 echo "Process analysis completed"
