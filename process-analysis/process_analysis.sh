@@ -67,7 +67,7 @@ temp_pstree="temp_${basename_pstree}.txt"
 sed -E 's/^\*+ +//; s/\*//g' "$pstree_file" > "$temp_pstree"
 
 # Step 2: Hapus semua sisa * di mana pun
-pstree_file="temp_pstree.txt"
+pstree_file="$temp_pstree"
 
 psscan_output="output_${basename_psscan}"
 pstree_output="output_pstree_analysis_${basename_pstree%.txt}.csv"
@@ -119,3 +119,6 @@ awk -F'\t' 'BEGIN{OFS=","} /^[0-9]+/ { print $1, $2, tolower($3), $11, $13 }' "$
 
   echo "$pid,$ppid,$image,$norm_path,$parent_proc,$status"
 done >> "$pstree_output"
+rm $psscan_output
+rm $temp_pstree
+echo "Process analysis completed"
