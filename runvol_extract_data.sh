@@ -8,7 +8,7 @@ fi
 
 MEMFILE="$1"
 MEMBASENAME=$(basename "$MEMFILE")
-OUTDIR="output"
+OUTDIR="output_$MEMBASENAME"
 
 # Membuat folder output jika belum ada
 mkdir -p "$OUTDIR"
