@@ -52,8 +52,8 @@ run_plugin() {
 export -f run_plugin
 export MEMFILE MEMBASENAME OUTDIR
 
-# Jalankan plugin berat paralel (maks 4 proses)
-printf "%s\n" "${HEAVY_PLUGINS[@]}" | xargs -P 6 -I{} bash -c 'run_plugin "$@"' _ {} heavy &
+# Jalankan plugin berat paralel (maks 3 proses)
+printf "%s\n" "${HEAVY_PLUGINS[@]}" | xargs -P 3 -I{} bash -c 'run_plugin "$@"' _ {} heavy &
 
 # Jalankan plugin ringan paralel (maks 6 proses)
 printf "%s\n" "${LIGHT_PLUGINS[@]}" | xargs -P 6 -I{} bash -c 'run_plugin "$@"' _ {} light
