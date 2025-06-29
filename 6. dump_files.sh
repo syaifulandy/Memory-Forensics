@@ -45,8 +45,8 @@ while read -r PID; do
   
   # Jalankan dan simpan output ke log
 
-  OUTPUT=$(vol -f "$VMEM_PATH" windows.dumpfiles --pid "$PID" 2>&1)
-  echo "$OUTPUT" | tee -a dump_result.log > tmp_output.log
+  echo "===== PID $PID =====" | tee -a dump_result.log
+  vol -f "$VMEM_PATH" windows.dumpfiles --pid "$PID" 2>&1 | tee -a dump_result.log > tmp_output.log
 
   if grep -qE '^\S+\s+\S+\s+\S+\s+file\.' tmp_output.log; then
     grep -i 'Result: OK' tmp_output.log >> dump_success.log
