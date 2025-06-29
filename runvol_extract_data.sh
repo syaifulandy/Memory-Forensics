@@ -56,7 +56,7 @@ export MEMFILE MEMBASENAME OUTDIR
 printf "%s\n" "${HEAVY_PLUGINS[@]}" | xargs -P 2 -I{} bash -c 'run_plugin "$@"' _ {} heavy &
 
 # Jalankan plugin ringan paralel (maks 6 proses)
-printf "%s\n" "${LIGHT_PLUGINS[@]}" | xargs -P 4 -I{} bash -c 'run_plugin "$@"' _ {} light
+printf "%s\n" "${LIGHT_PLUGINS[@]}" | xargs -P 2 -I{} bash -c 'run_plugin "$@"' _ {} light
 
 # Tunggu proses latar belakang
 wait
