@@ -1,14 +1,14 @@
 #!/bin/bash
 
-# Inputan: file memory dan hasil analisis proses di folder yang sama
-
 # === Bagian 1: Validasi & Persiapan ===
-if [[ $# -ne 1 ]]; then
-  echo "Usage: $0 /path/to/file.vmem"
+if [[ $# -lt 1 ]]; then
+  echo "Usage: $0 /path/to/file.vmem [quick|normal]"
   exit 1
 fi
 
 VMEM_PATH="$1"
+FILTER_MODE="${2:-quick}"  # default: quick
+
 if [[ ! -f "$VMEM_PATH" ]]; then
   echo "File tidak ditemukan: $VMEM_PATH"
   exit 2
@@ -27,10 +27,27 @@ OUTPUT_DIR="dump_memory_${VMEM_NAME}"
 mkdir -p "$OUTPUT_DIR"
 
 UNIQUE_PID_FILE="${OUTPUT_DIR}/unique_pid_${VMEM_NAME}"
-grep -v '^pid' "$CSV_FILE" | grep -v ',OK$' | cut -d',' -f1 | sort -n | uniq > "$UNIQUE_PID_FILE"
+
+echo "[*] Mode filter: $FILTER_MODE"
+
+# === Bagian 2: Ekstraksi PID Unik Berdasarkan Mode ===
+case "$FILTER_MODE" in
+  quick)
+    grep -v '^pid' "$CSV_FILE" | grep -v ',OK$' | grep -iv "system32" | cut -d',' -f1 | sort -n | uniq > "$UNIQUE_PID_FILE"
+    ;;
+  normal)
+    grep -v '^pid' "$CSV_FILE" | grep -v ',OK$' | cut -d',' -f1 | sort -n | uniq > "$UNIQUE_PID_FILE"
+    ;;
+  *)
+    echo "Mode tidak dikenali: $FILTER_MODE"
+    echo "Gunakan: quick (default) atau normal"
+    exit 4
+    ;;
+esac
+
 echo "[+] PID unik disimpan di: $UNIQUE_PID_FILE"
 
-# === Bagian 2: Dump per PID ===
+# === Bagian 3: Dump per PID (PARALEL) ===
 echo "[+] Menjalankan dumpfiles per PID dari direktori: $OUTPUT_DIR"
 pushd "$OUTPUT_DIR" > /dev/null
 
@@ -38,24 +55,36 @@ pushd "$OUTPUT_DIR" > /dev/null
 > dump_success.log
 > dump_failed.log
 
-while read -r PID; do
-  [[ -z "$PID" ]] && continue
+export VMEM_PATH
+
+dump_pid() {
+  PID="$1"
+  [[ -z "$PID" ]] && exit 0
+
   TIMESTAMP=$(date +%H:%M:%S)
   echo "[$TIMESTAMP] Dumping PID $PID ..."
-  
-  # Jalankan dan simpan output ke log
 
-  echo "===== PID $PID =====" | tee -a dump_result.log
-  vol -f "$VMEM_PATH" windows.dumpfiles --pid "$PID" 2>&1 | tee -a dump_result.log > tmp_output.log
+  PID_DIR="pid_$PID"
+  mkdir -p "$PID_DIR"
+  pushd "$PID_DIR" > /dev/null
 
-  if grep -qE '^\S+\s+\S+\s+\S+\s+file\.' tmp_output.log; then
-    grep -i 'Result: OK' tmp_output.log >> dump_success.log
-    echo "  [+] PID $PID: SUKSES"
+  echo "===== PID $PID - dumpfiles =====" >> ../dump_result.log
+  vol -f "$VMEM_PATH" windows.dumpfiles --pid "$PID" >> ../dump_result.log 2>&1 > ../tmp_output_$PID.log
+
+  if grep -qE '^\S+\s+\S+\s+\S+\s+file\.' ../tmp_output_$PID.log; then
+    grep -i 'Result: OK' ../tmp_output_$PID.log >> ../dump_success.log
+    echo "  [+] PID $PID dumpfiles: SUKSES"
   else
-    grep -i 'Result:' tmp_output.log >> dump_failed.log
-    echo "  [-] PID $PID: GAGAL"
+    grep -i 'Result:' ../tmp_output_$PID.log >> ../dump_failed.log
+    echo "  [-] PID $PID dumpfiles: GAGAL"
   fi
-done < "../$UNIQUE_PID_FILE"
 
-rm -f tmp_output.log
+  popd > /dev/null
+}
+
+export -f dump_pid
+
+cat "../$UNIQUE_PID_FILE" | xargs -P4 -I{} bash -c 'dump_pid "$@"' _ {}
+
+rm -f tmp_output_*.log
 popd > /dev/null
